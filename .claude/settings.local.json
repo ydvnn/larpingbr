@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(node --check server.mjs; npx vite build 2>&1 | Select-Object -Last 6)",
+      "PowerShell(npx vite build 2>&1 | Select-Object -Last 6)",
+      "PowerShell(npm install *)",
+      "PowerShell(npx vite build 2>&1 | Select-Object -Last 14)",
+      "PowerShell(npx vite build 2>&1 | Select-Object -Last 8)",
+      "PowerShell(npx vite build 2>&1 | Select-Object -Last 4)",
+      "PowerShell(npx vite build 2>&1 | Select-Object -Last 3)"
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Larping Brasil">
+  <defs>
+    <linearGradient id="lpBrand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f9e5b8" />
+      <stop offset="100%" stop-color="#d8b15c" />
+    </linearGradient>
+    <linearGradient id="lpBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d0e12" />
+      <stop offset="100%" stop-color="#050608" />
+    </linearGradient>
+    <linearGradient id="lpFacetTop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f9e5b8" stop-opacity="0.32" />
+      <stop offset="100%" stop-color="#e8c579" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="lpFacetBottom" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8c579" stop-opacity="0" />
+      <stop offset="100%" stop-color="#d8b15c" stop-opacity="0.18" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#lpBg)" />
+  <rect x="1" y="1" width="62" height="62" rx="13" fill="none" stroke="url(#lpBrand)" stroke-opacity="0.45" stroke-width="1.4" />
+  <path d="M32 12 L48 32 L16 32 Z" fill="url(#lpFacetTop)" />
+  <path d="M16 32 L48 32 L32 52 Z" fill="url(#lpFacetBottom)" />
+  <g fill="none" stroke="url(#lpBrand)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M32 12 L48 32 L32 52 L16 32 Z" stroke-width="2.2" />
+    <path d="M16 32 L48 32" stroke-width="1.8" />
+    <path d="M32 12 L32 52" stroke-width="1" stroke-opacity="0.45" />
+  </g>
+</svg>
