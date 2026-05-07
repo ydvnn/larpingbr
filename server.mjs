@@ -223,7 +223,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`larping running at ${appUrl}`);
+  console.log(`larping bound to ${host}:${port} (app_url=${appUrl})`);
 });
 
 resumePendingOrderPollers();
