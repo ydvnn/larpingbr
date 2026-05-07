@@ -5,6 +5,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { createServer as createViteServer } from "vite";
+import QRCode from "qrcode";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -222,7 +223,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`Larping Brasil running at ${appUrl}`);
+  console.log(`larping running at ${appUrl}`);
 });
 
 resumePendingOrderPollers();
@@ -236,7 +237,7 @@ async function handleApi(req, res) {
   }
 
   if (pathname === "/api/storefront" && req.method === "GET") {
-    return sendJson(res, 200, getStorefrontPayload());
+    return sendJson(res, 200, await getStorefrontPayload());
   }
 
   if (pathname === "/api/session" && req.method === "GET") {
@@ -355,7 +356,7 @@ async function handleApi(req, res) {
   if (pathname === "/api/checkout" && req.method === "POST") {
     const session = getSession(req);
     if (!session) {
-      return sendJson(res, 401, { error: "unauthorized", message: "Faça login com o Discord." });
+      return sendJson(res, 401, { error: "unauthorized", message: "faça login com o discord." });
     }
 
     const { body } = await readRequestBody(req);
@@ -492,15 +493,15 @@ async function handleApi(req, res) {
     const order = statements.getOrderByExternalId.get(externalId);
     if (!order) {
       res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
-      res.end("<h1>Pedido nao encontrado.</h1>");
+      res.end("<h1>pedido não encontrado.</h1>");
       return true;
     }
 
     const paymentData = getPaymentData(order);
     const amount = formatCurrency(order.amount_cents);
-    const qrSource = paymentData.qrCode || (paymentData.pixCode ? buildQrCodeUrl(paymentData.pixCode) : "");
+    const qrSvg = paymentData.pixCode ? renderDottedQrSvg(paymentData.pixCode, { size: 220 }) : "";
     const statusLabel = translateStatus(order.status);
-    const methodLabel = (paymentData.method || "pix").toUpperCase();
+    const methodLabel = (paymentData.method || "pix").toLowerCase();
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(`
       <!doctype html>
@@ -508,132 +509,168 @@ async function handleApi(req, res) {
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <title>Checkout Larper+</title>
+          <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+          <title>checkout</title>
           <style>
-            @import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap");
+            @import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap");
             :root {
               color-scheme: dark;
-              --bg: #030405;
-              --panel: rgba(12, 13, 16, .92);
-              --panel-soft: rgba(255, 255, 255, .04);
-              --line: rgba(232, 197, 121, .16);
-              --line-strong: rgba(232, 197, 121, .32);
-              --text: #f7f1e6;
-              --muted: #b8b3aa;
-              --gold: #e8c579;
-              --gold-strong: #f3d999;
+              --bg: #060606;
+              --panel-soft: rgba(255, 255, 255, .03);
+              --line: rgba(255, 255, 255, .08);
+              --line-strong: rgba(255, 255, 255, .22);
+              --text: #f3f3f3;
+              --muted: #888888;
               --success: #7bd389;
-              --shadow: 0 28px 90px rgba(0, 0, 0, .42);
             }
             * { box-sizing: border-box; }
-            html, body { height: auto; }
+            html, body { height: 100%; }
             body {
-              min-width: 320px;
-              min-height: 100vh;
               margin: 0;
-              font-family: Manrope, system-ui, sans-serif;
+              min-width: 320px;
+              font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
               color: var(--text);
               background:
-                radial-gradient(circle at 50% -10%, rgba(232, 197, 121, .08), transparent 28rem),
-                linear-gradient(180deg, #020304, #050608 48%, #08090c);
+                radial-gradient(circle at 50% 0%, rgba(255, 255, 255, .04), transparent 28rem),
+                linear-gradient(180deg, #050505 0%, #080808 48%, #0a0a0a 100%);
+              overflow: hidden;
             }
             a { color: inherit; text-decoration: none; }
-            button, textarea { font: inherit; }
+            button, input { font: inherit; }
             p { margin: 0; color: var(--muted); line-height: 1.6; }
             .page-shell {
-              width: min(720px, calc(100vw - 32px));
+              width: min(960px, calc(100vw - 32px));
+              height: 100vh;
               margin: 0 auto;
-              padding: 20px 0 56px;
+              padding: 16px 0;
               display: flex;
               flex-direction: column;
-              gap: 28px;
+              gap: 16px;
             }
             .topbar {
+              position: sticky;
+              top: 16px;
+              z-index: 30;
               display: flex;
               align-items: center;
               justify-content: space-between;
               gap: 18px;
-              padding: 14px 18px;
+              padding: 8px 10px 8px 14px;
               border: 1px solid var(--line);
-              border-radius: 20px;
-              background: rgba(5, 6, 8, .82);
+              border-radius: 16px;
+              background: transparent;
               backdrop-filter: blur(22px);
-              box-shadow: var(--shadow);
+              -webkit-backdrop-filter: blur(22px);
+              box-shadow: 0 12px 36px rgba(0, 0, 0, .32);
+              flex: 0 0 auto;
             }
             .brand {
               display: flex;
               align-items: center;
               gap: 12px;
               min-width: 0;
-              font-weight: 800;
             }
             .brand-mark {
-              width: 40px;
-              height: 40px;
+              width: 38px;
+              height: 38px;
               display: grid;
               place-items: center;
               flex: 0 0 auto;
-              border: 1px solid var(--line-strong);
-              border-radius: 12px;
-              background: linear-gradient(145deg, rgba(232, 197, 121, .24), rgba(58, 61, 68, .46));
-              color: #fff2cd;
+              border: 1px solid var(--line);
+              border-radius: 10px;
+              background: var(--panel-soft);
+              color: #ffffff;
             }
-            .brand-mark svg { width: 24px; height: 24px; }
-            .back-link {
-              color: var(--muted);
-              font-size: .85rem;
-              font-weight: 600;
-            }
-            .back-link:hover { color: var(--text); }
-            .header-block {
-              text-align: center;
+            .brand-mark svg { width: 22px; height: 22px; }
+            .brand-text {
               display: flex;
               flex-direction: column;
-              gap: 10px;
+              line-height: 1.15;
+            }
+            .brand-text strong {
+              font-weight: 400;
+              font-size: 0.92rem;
+              letter-spacing: 0;
+            }
+            .brand-text small {
+              color: var(--muted);
+              font-size: 0.68rem;
+              letter-spacing: 0.02em;
+              margin-top: 2px;
+            }
+            .back-link {
+              color: var(--muted);
+              font-size: 0.82rem;
+              font-weight: 500;
+              padding: 8px 14px;
+              border: 1px solid var(--line);
+              border-radius: 12px;
+              background: var(--panel-soft);
+              transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+            }
+            .back-link:hover {
+              color: var(--text);
+              border-color: var(--line-strong);
+              background: rgba(255, 255, 255, 0.05);
+            }
+            .main {
+              flex: 1;
+              min-height: 0;
+              display: grid;
+              place-items: center;
+            }
+            .checkout-card {
+              width: 100%;
+              max-height: 100%;
+              border: 1px solid var(--line);
+              border-radius: 18px;
+              background: transparent;
+              backdrop-filter: blur(22px);
+              -webkit-backdrop-filter: blur(22px);
+              box-shadow: 0 12px 36px rgba(0, 0, 0, .32);
+              padding: 24px;
+              display: grid;
+              grid-template-columns: auto minmax(0, 1fr);
+              gap: 28px;
+              align-items: center;
+            }
+            .qr-wrap {
+              display: grid;
+              place-items: center;
+              padding: 8px;
+              border: 1px solid var(--line);
+              border-radius: 14px;
+              background: var(--bg);
+              flex: 0 0 auto;
+            }
+            .qr-wrap svg {
+              display: block;
+              width: 220px;
+              height: 220px;
+            }
+            .checkout-side {
+              display: flex;
+              flex-direction: column;
+              gap: 16px;
+              min-width: 0;
             }
             .eyebrow {
               margin: 0;
-              color: var(--gold);
-              font-size: .72rem;
-              font-weight: 800;
-              letter-spacing: .14em;
-              text-transform: uppercase;
+              color: var(--muted);
+              font-size: 0.7rem;
+              font-weight: 600;
+              letter-spacing: 0.04em;
             }
             h1 {
-              margin: 0;
-              font-family: "Instrument Serif", serif;
-              font-size: clamp(2.2rem, 5vw, 3rem);
-              font-weight: 400;
-              letter-spacing: -.03em;
-              line-height: 1.05;
-              color: var(--text);
-            }
-            .lead {
-              max-width: 52ch;
-              margin: 0 auto;
-              font-size: .98rem;
-            }
-            .card {
-              border: 1px solid var(--line);
-              border-radius: 20px;
-              background: linear-gradient(180deg, rgba(12, 13, 16, .92), rgba(5, 6, 8, .97));
-              box-shadow: var(--shadow);
-              padding: 24px;
-              display: flex;
-              flex-direction: column;
-              gap: 18px;
-            }
-            .card-title {
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 12px;
-              margin: 0;
-              font-size: 1rem;
+              margin: 4px 0 0;
+              font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+              font-size: clamp(1.7rem, 3.2vw, 2.2rem);
               font-weight: 700;
+              letter-spacing: -0.02em;
+              line-height: 1.1;
               color: var(--text);
             }
-            .summary-list {
+            .summary {
               display: flex;
               flex-direction: column;
               gap: 0;
@@ -645,109 +682,66 @@ async function handleApi(req, res) {
             .summary-row {
               display: flex;
               justify-content: space-between;
-              align-items: baseline;
+              align-items: center;
               gap: 16px;
-              padding: 14px 16px;
+              padding: 12px 14px;
               border-top: 1px solid var(--line);
             }
             .summary-row:first-child { border-top: 0; }
             .summary-row span {
               color: var(--muted);
-              font-size: .88rem;
+              font-size: 0.82rem;
             }
             .summary-row strong {
               color: var(--text);
               text-align: right;
-              font-weight: 700;
-              word-break: break-all;
+              font-weight: 600;
+              word-break: break-word;
             }
             .summary-row.total strong {
-              color: var(--gold-strong);
+              font-family: "Instrument Serif", serif;
+              font-style: italic;
+              font-weight: 400;
+              color: #ffffff;
               font-size: 1.6rem;
-              letter-spacing: -.02em;
+              letter-spacing: -0.02em;
             }
             .pill {
               display: inline-flex;
               align-items: center;
-              padding: 4px 10px;
+              padding: 3px 10px;
               border: 1px solid var(--line);
               border-radius: 999px;
-              background: rgba(255, 255, 255, .04);
+              background: var(--panel-soft);
               color: var(--text);
-              font-size: .68rem;
-              font-weight: 800;
-              letter-spacing: .1em;
-              text-transform: uppercase;
-            }
-            .pill.pending { color: var(--gold-strong); border-color: var(--line-strong); }
-            .pill.paid { color: var(--success); border-color: rgba(123, 211, 137, .4); }
-            .pix-grid {
-              display: grid;
-              grid-template-columns: auto 1fr;
-              gap: 22px;
-              align-items: center;
-            }
-            .qr-wrap {
-              display: grid;
-              place-items: center;
-              padding: 12px;
-              border: 1px solid var(--line);
-              border-radius: 16px;
-              background: #fff;
-              flex: 0 0 auto;
-            }
-            .qr-wrap img {
-              width: 200px;
-              height: 200px;
-              display: block;
-              object-fit: contain;
-            }
-            .pix-instructions {
-              display: flex;
-              flex-direction: column;
-              gap: 10px;
-              min-width: 0;
-            }
-            .pix-instructions ol {
-              margin: 0;
-              padding-left: 20px;
-              display: flex;
-              flex-direction: column;
-              gap: 6px;
-              color: var(--muted);
-              font-size: .92rem;
-              line-height: 1.5;
-            }
-            .pix-instructions ol::marker { color: var(--gold); }
-            .copy-block {
-              display: flex;
-              flex-direction: column;
-              gap: 10px;
-            }
-            .copy-block label {
-              color: var(--muted);
-              font-size: .8rem;
+              font-size: 0.68rem;
               font-weight: 600;
-              letter-spacing: .04em;
+              letter-spacing: 0.06em;
             }
-            textarea {
-              width: 100%;
-              min-height: 96px;
-              resize: vertical;
-              padding: 14px;
+            .pill.pending { color: var(--text); border-color: var(--line); }
+            .pill.paid { color: var(--success); border-color: rgba(123, 211, 137, .4); }
+            .copy-row {
+              display: flex;
+              gap: 10px;
+              align-items: stretch;
+            }
+            .pix-input {
+              flex: 1;
+              min-width: 0;
+              padding: 12px 14px;
               border: 1px solid var(--line);
               border-radius: 12px;
-              background: rgba(3, 4, 5, .76);
-              color: var(--text);
+              background: var(--panel-soft);
+              color: var(--muted);
               font-family: ui-monospace, "SF Mono", Menlo, monospace;
-              font-size: .82rem;
-              line-height: 1.45;
-              word-break: break-all;
+              font-size: 0.78rem;
+              line-height: 1.4;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
             }
-            textarea:focus { outline: 1px solid var(--line-strong); }
             .btn {
-              width: 100%;
-              min-height: 46px;
+              min-height: 42px;
               display: inline-flex;
               align-items: center;
               justify-content: center;
@@ -755,155 +749,138 @@ async function handleApi(req, res) {
               padding: 0 18px;
               border: 1px solid transparent;
               border-radius: 12px;
-              background: linear-gradient(135deg, #f9e5b8, var(--gold));
-              color: #151009;
+              background: #ffffff;
+              color: #050505;
               cursor: pointer;
-              font-weight: 800;
+              font-weight: 700;
+              letter-spacing: 0.02em;
               text-align: center;
               transition: transform .15s ease, filter .15s ease;
+              flex: 0 0 auto;
             }
-            .btn:hover { filter: brightness(1.05); }
-            .btn:active { transform: translateY(1px); }
+            .btn:hover { transform: translateY(-1px); }
             .btn.ghost {
-              background: transparent;
+              background: var(--panel-soft);
               color: var(--text);
               border-color: var(--line);
             }
+            .btn.ghost:hover { border-color: var(--line-strong); background: rgba(255, 255, 255, 0.06); }
+            .btn.full { width: 100%; }
             .status-line {
               display: flex;
               align-items: center;
               gap: 10px;
-              padding: 12px 16px;
+              padding: 10px 14px;
               border: 1px solid var(--line);
               border-radius: 12px;
-              background: rgba(255, 255, 255, .03);
-              color: var(--gold-strong);
-              font-weight: 700;
-              font-size: .9rem;
+              background: var(--panel-soft);
+              color: var(--muted);
+              font-weight: 500;
+              font-size: 0.82rem;
             }
             .status-dot {
-              width: 8px;
-              height: 8px;
+              width: 6px;
+              height: 6px;
               border-radius: 50%;
-              background: var(--gold);
-              box-shadow: 0 0 0 4px rgba(232, 197, 121, .15);
+              background: var(--text);
+              box-shadow: 0 0 0 3px rgba(255, 255, 255, .08);
               animation: pulse 1.6s ease-in-out infinite;
             }
-            .status-line.paid { color: var(--success); }
-            .status-line.paid .status-dot { background: var(--success); box-shadow: 0 0 0 4px rgba(123, 211, 137, .18); animation: none; }
+            .status-line.paid { color: var(--success); border-color: rgba(123, 211, 137, .35); }
+            .status-line.paid .status-dot { background: var(--success); box-shadow: 0 0 0 3px rgba(123, 211, 137, .18); animation: none; }
             @keyframes pulse {
               0%, 100% { opacity: 1; }
               50% { opacity: .35; }
             }
-            .help {
-              text-align: center;
-              font-size: .85rem;
+            @media (max-width: 860px) {
+              body { overflow: auto; }
+              .page-shell { height: auto; min-height: 100vh; }
+              .checkout-card {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                padding: 20px;
+              }
+              .qr-wrap { justify-self: center; }
+              .qr-wrap img { width: 200px; height: 200px; }
+              h1 { text-align: center; }
+              .eyebrow { text-align: center; }
             }
             @media (max-width: 640px) {
-              .page-shell { width: min(100vw - 24px, 720px); padding-top: 12px; gap: 22px; }
-              .card { padding: 20px; }
-              .pix-grid { grid-template-columns: 1fr; gap: 18px; }
-              .qr-wrap { justify-self: center; }
-              .qr-wrap img { width: 220px; height: 220px; }
+              .page-shell { width: min(100vw - 48px, 960px); padding-top: 10px; gap: 12px; }
               .summary-row.total strong { font-size: 1.4rem; }
+              .copy-row { flex-direction: column; }
+              .btn { width: 100%; }
             }
           </style>
         </head>
         <body>
           <div class="page-shell">
             <header class="topbar">
-              <a class="brand" href="/" aria-label="Voltar para a Larping Brasil">
+              <a class="brand" href="/" aria-label="voltar">
                 <span class="brand-mark">
                   <svg viewBox="0 0 36 36" aria-hidden="true">
-                    <path d="M18 4 L29 18 L7 18 Z" fill="currentColor" fill-opacity="0.18" />
+                    <path d="M18 4 L8 16 L18 22 Z" fill="currentColor" fill-opacity="0.22" />
+                    <path d="M18 4 L18 22 L28 16 Z" fill="currentColor" fill-opacity="0.12" />
+                    <path d="M8 16 L18 22 L18 32 Z" fill="currentColor" fill-opacity="0.16" />
                     <g stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" fill="none">
-                      <path d="M18 4 L29 18 L18 32 L7 18 Z" stroke-width="1.9" />
-                      <path d="M7 18 L29 18" stroke-width="1.5" />
-                      <path d="M18 4 L18 32" stroke-width="1" stroke-opacity="0.45" />
+                      <path d="M18 4 L28 16 L18 32 L8 16 Z" stroke-width="1.9" />
+                      <path d="M8 16 L18 22 L28 16" stroke-width="1.4" />
+                      <path d="M18 4 L18 22 L18 32" stroke-width="1.3" />
                     </g>
                   </svg>
                 </span>
-                <span>Larping Brasil</span>
+                <div class="brand-text">
+                  <strong>larping</strong>
+                  <small>${paymentData.mode === "demo" ? "ambiente de teste" : "checkout seguro"}</small>
+                </div>
               </a>
-              <a class="back-link" href="/">&larr; Voltar</a>
+              <a class="back-link" href="/">&larr; voltar</a>
             </header>
 
-            <section class="header-block">
-              <p class="eyebrow">${paymentData.mode === "demo" ? "Ambiente de teste" : "Checkout seguro"}</p>
-              <h1>Finalize seu pagamento</h1>
-              <p class="lead">Pague com PIX em segundos. Assim que o pagamento for confirmado, seu acesso ao Larper+ é liberado automaticamente no Discord.</p>
-            </section>
+            <main class="main">
+              <section class="checkout-card" aria-label="pagamento">
+                ${qrSvg ? `<div class="qr-wrap" aria-label="qr code pix">${qrSvg}</div>` : ""}
+                <div class="checkout-side">
+                  <div>
+                    <p class="eyebrow">${escapeHtml(methodLabel)} · ${escapeHtml((order.product_name || "").toLowerCase())}</p>
+                    <h1>${amount}</h1>
+                  </div>
 
-            <section class="card" aria-label="Resumo do pedido">
-              <h2 class="card-title">
-                Resumo do pedido
-                <span class="pill ${order.status === "paid" ? "paid" : "pending"}">${escapeHtml(statusLabel)}</span>
-              </h2>
-              <div class="summary-list">
-                <div class="summary-row">
-                  <span>Produto</span>
-                  <strong>${escapeHtml(order.product_name)}</strong>
-                </div>
-                <div class="summary-row">
-                  <span>Método</span>
-                  <strong>${escapeHtml(methodLabel)}</strong>
-                </div>
-                <div class="summary-row">
-                  <span>Identificador</span>
-                  <strong>${escapeHtml(order.external_id)}</strong>
-                </div>
-                <div class="summary-row total">
-                  <span>Total a pagar</span>
-                  <strong>${amount}</strong>
-                </div>
-              </div>
-            </section>
-
-            ${
-              qrSource || paymentData.pixCode
-                ? `<section class="card" aria-label="Pagamento via PIX">
-                    <h2 class="card-title">Pagamento via PIX</h2>
-                    <div class="pix-grid">
-                      ${qrSource ? `<div class="qr-wrap"><img src="${escapeHtml(qrSource)}" alt="QR Code PIX" /></div>` : ""}
-                      <div class="pix-instructions">
-                        <ol>
-                          <li>Abra o app do seu banco e escolha pagar via PIX.</li>
-                          <li>Escaneie o QR Code ao lado ou use a opção PIX Copia e Cola.</li>
-                          <li>Confirme o pagamento. A liberação no Discord é automática.</li>
-                        </ol>
-                      </div>
+                  <div class="summary">
+                    <div class="summary-row">
+                      <span>produto</span>
+                      <strong>${escapeHtml((order.product_name || "").toLowerCase())}</strong>
                     </div>
-                    ${
-                      paymentData.pixCode
-                        ? `<div class="copy-block">
-                            <label for="pix-code">PIX Copia e Cola</label>
-                            <textarea id="pix-code" readonly>${escapeHtml(paymentData.pixCode)}</textarea>
-                            <button id="copy-pix" class="btn" type="button">Copiar código PIX</button>
-                          </div>`
-                        : ""
-                    }
-                  </section>`
-                : ""
-            }
+                    <div class="summary-row">
+                      <span>status</span>
+                      <strong><span class="pill ${order.status === "paid" ? "paid" : "pending"}">${escapeHtml(statusLabel)}</span></strong>
+                    </div>
+                  </div>
 
-            ${paymentData.billetUrl ? `<a class="btn ghost" href="${escapeHtml(paymentData.billetUrl)}" target="_blank" rel="noreferrer">Abrir boleto em nova aba</a>` : ""}
+                  ${
+                    paymentData.pixCode
+                      ? `<div class="copy-row">
+                          <input id="pix-code" class="pix-input" value="${escapeHtml(paymentData.pixCode)}" readonly />
+                          <button id="copy-pix" class="btn" type="button">copiar</button>
+                        </div>`
+                      : ""
+                  }
 
-            ${
-              paymentData.mode === "demo"
-                ? `<section class="card">
-                    <h2 class="card-title">Modo demonstração</h2>
-                    <p>Esta tela está no modo de teste local. Use o botão abaixo para simular um pagamento aprovado e validar o fluxo antes de conectar as credenciais reais.</p>
-                    <button id="pay" class="btn">Simular pagamento aprovado</button>
-                  </section>`
-                : ""
-            }
+                  ${paymentData.billetUrl ? `<a class="btn ghost full" href="${escapeHtml(paymentData.billetUrl)}" target="_blank" rel="noreferrer">abrir boleto</a>` : ""}
 
-            <div id="status-line" class="status-line">
-              <span class="status-dot"></span>
-              <span id="status-text">Aguardando confirmação do pagamento…</span>
-            </div>
+                  ${
+                    paymentData.mode === "demo"
+                      ? `<button id="pay" class="btn ghost full">simular pagamento aprovado</button>`
+                      : ""
+                  }
 
-            <p class="help">Dúvidas? Entre em contato pelo nosso Discord oficial.</p>
+                  <div id="status-line" class="status-line">
+                    <span class="status-dot"></span>
+                    <span id="status-text">aguardando confirmação do pagamento…</span>
+                  </div>
+                </div>
+              </section>
+            </main>
           </div>
           <script>
             const payButton = document.getElementById("pay");
@@ -921,26 +898,26 @@ async function handleApi(req, res) {
                   document.execCommand("copy");
                 }
                 const original = copyPixButton.textContent;
-                copyPixButton.textContent = "Código PIX copiado!";
-                setTimeout(() => { copyPixButton.textContent = original; }, 2200);
+                copyPixButton.textContent = "copiado!";
+                setTimeout(() => { copyPixButton.textContent = original; }, 2000);
               });
             }
 
             if (payButton) {
               payButton.addEventListener("click", async () => {
                 payButton.disabled = true;
-                payButton.textContent = "Processando…";
+                payButton.textContent = "processando…";
                 await fetch("/api/dev/orders/${order.external_id}/pay", { method: "POST" });
                 location.href = "/?payment=approved";
               });
             }
 
             const statusLabels = {
-              pending: "Aguardando confirmação do pagamento…",
-              paid: "Pagamento confirmado! Redirecionando…",
-              failed: "Pagamento recusado. Tente novamente.",
-              cancelled: "Pagamento cancelado.",
-              expired: "Pagamento expirado."
+              pending: "aguardando confirmação do pagamento…",
+              paid: "pagamento confirmado. redirecionando…",
+              failed: "pagamento recusado. tenta de novo.",
+              cancelled: "pagamento cancelado.",
+              expired: "pagamento expirado."
             };
 
             const poll = async () => {
@@ -948,7 +925,7 @@ async function handleApi(req, res) {
                 const response = await fetch("/api/orders/${order.external_id}/status", { credentials: "include" });
                 if (!response.ok) return;
                 const data = await response.json();
-                const label = statusLabels[data.status] || ("Status: " + data.status);
+                const label = statusLabels[data.status] || ("status: " + data.status);
                 statusText.textContent = label;
                 if (data.status === "paid") {
                   statusLine.classList.add("paid");
@@ -969,7 +946,52 @@ async function handleApi(req, res) {
   return false;
 }
 
-function getStorefrontPayload() {
+const guildMembersCache = { data: null, fetchedAt: 0, ttlMs: 10 * 60 * 1000 };
+
+async function fetchGuildMembersWithRoles(limit = 24) {
+  const now = Date.now();
+  if (guildMembersCache.data && now - guildMembersCache.fetchedAt < guildMembersCache.ttlMs) {
+    return guildMembersCache.data.slice(0, limit);
+  }
+
+  const guildId = process.env.DISCORD_GUILD_ID;
+  const token = process.env.DISCORD_BOT_TOKEN;
+  if (!guildId || !token) {
+    return [];
+  }
+
+  try {
+    const response = await fetch(`${discordApiBase}/guilds/${guildId}/members?limit=1000`, {
+      headers: { Authorization: `Bot ${token}` }
+    });
+    if (!response.ok) {
+      console.warn(`[guild-members] discord ${response.status}`);
+      return guildMembersCache.data ? guildMembersCache.data.slice(0, limit) : [];
+    }
+    const members = await response.json();
+    const filtered = members
+      .filter((m) => m?.user && !m.user.bot)
+      .filter((m) => Array.isArray(m.roles) && m.roles.length > 0)
+      .map((m) => {
+        const u = m.user;
+        return {
+          name: u.global_name || m.nick || u.username,
+          username: u.username,
+          avatar: u.avatar
+            ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=128`
+            : null
+        };
+      });
+    guildMembersCache.data = filtered;
+    guildMembersCache.fetchedAt = now;
+    return filtered.slice(0, limit);
+  } catch (error) {
+    console.warn("[guild-members] fetch error", error?.message || error);
+    return guildMembersCache.data ? guildMembersCache.data.slice(0, limit) : [];
+  }
+}
+
+async function getStorefrontPayload() {
   const products = statements.getProducts.all().map((product) => ({
     id: product.id,
     slug: product.slug,
@@ -992,15 +1014,38 @@ function getStorefrontPayload() {
   const recentBuyers = statements.recentBuyers.all();
   const stats = statements.paidStats.get();
 
+  let topBuyersOut = topBuyers.map((buyer) => ({
+    name: buyer.name,
+    username: buyer.username,
+    avatar: buyer.avatar,
+    total: formatCurrency(buyer.total_spent)
+  }));
+
+  let recentBuyersOut = recentBuyers.map((buyer) => ({
+    name: buyer.name,
+    username: buyer.username,
+    avatar: buyer.avatar,
+    product: buyer.product_name
+  }));
+
+  if (recentBuyersOut.length === 0 || topBuyersOut.length === 0) {
+    const guildMembers = await fetchGuildMembersWithRoles(24);
+    if (recentBuyersOut.length === 0) {
+      recentBuyersOut = guildMembers.map((m) => ({ ...m, product: "larper+" }));
+    }
+    if (topBuyersOut.length === 0 && guildMembers.length > 0) {
+      topBuyersOut = guildMembers.slice(0, 1).map((m) => ({ ...m, total: null }));
+    }
+  }
+
   return {
     authConfigured: isDiscordConfigured(),
     paymentConfigured: isInvictusConfigured(),
     guildConfigured: Boolean(process.env.DISCORD_GUILD_ID && process.env.DISCORD_BOT_TOKEN),
     hero: {
-      eyebrow: "Larping Brasil premium membership",
-      title: "Larper+ concentra o acesso da comunidade em uma única oferta de entrada.",
-      description:
-        "O foco agora é converter em um pagamento único de R$30, com checkout simples, acesso premium e liberação automática no Discord."
+      eyebrow: "larping",
+      title: "larper+ concentra o acesso da comunidade em uma única oferta.",
+      description: "pagamento único de R$ 30. acesso liberado na sequência."
     },
     stats: [
       { label: "Membros ativos", value: `${Math.max(stats.sales_count, 120)}+` },
@@ -1009,32 +1054,8 @@ function getStorefrontPayload() {
     ],
     product: primaryProduct,
     products,
-    topBuyers:
-      topBuyers.length > 0
-        ? topBuyers.map((buyer) => ({
-            name: buyer.name,
-            username: buyer.username,
-            avatar: buyer.avatar,
-            total: formatCurrency(buyer.total_spent)
-          }))
-        : [
-            { name: "Lootier", total: "R$ 3.180,00" },
-            { name: "Carter_royall", total: "R$ 150,00" },
-            { name: "Charlieatk2", total: "R$ 120,00" }
-          ],
-    recentBuyers:
-      recentBuyers.length > 0
-        ? recentBuyers.map((buyer) => ({
-            name: buyer.name,
-            username: buyer.username,
-            avatar: buyer.avatar,
-            product: buyer.product_name
-          }))
-        : [
-            { name: "Q_4", product: "Larper+" },
-            { name: "Lootier", product: "Larper+" },
-            { name: "aoq", product: "Larper+" }
-          ]
+    topBuyers: topBuyersOut,
+    recentBuyers: recentBuyersOut
   };
 }
 
@@ -1042,20 +1063,20 @@ function seedProducts() {
   const items = [
     {
       slug: "larper-plus",
-      name: "Larper+",
-      description: "Acesso oficial da comunidade fechada.",
+      name: "larper+",
+      description: "acervo, repertório digital e discord privado.",
       price_cents: 3000,
       role_id: process.env.DISCORD_ROLE_LARPER_PLUS_ID || process.env.DISCORD_ROLE_CLUB_ID || "",
       invictus_offer_hash: process.env.INVICTUSPAY_OFFER_HASH_LARPER_PLUS || process.env.INVICTUSPAY_OFFER_HASH_CLUB || "",
       invictus_product_hash:
         process.env.INVICTUSPAY_PRODUCT_HASH_LARPER_PLUS || process.env.INVICTUSPAY_PRODUCT_HASH_CLUB || "",
-      badge: "Pagamento único",
+      badge: "pagamento único",
       accent: "gold",
       benefits: JSON.stringify([
-        "Acesso aos canais e benefícios premium",
-        "Acesso a materiais, métodos e mídias exclusivas",
-        "Atualizações recorrentes incluídas no acesso",
-        "Entrega automática vinculada ao Discord"
+        "discord privado e área de membros",
+        "repertório digital editável, fonte aberta",
+        "acervo de mídia, cenário e ambientação",
+        "acesso liberado automaticamente após a entrada"
       ]),
       featured: 1
     }
@@ -1224,7 +1245,7 @@ async function createInvictusCheckout({ order, user, product, origin }) {
   };
 
   if (payload.payment_method === "credit_card") {
-    throw new Error("O pagamento por cartao exige dados adicionais no backend. Nesta base o fluxo esta pronto para PIX e boleto.");
+    throw new Error("o pagamento por cartão exige dados adicionais no backend. nesta base o fluxo está pronto para pix e boleto.");
   }
 
   const endpoint = new URL(`${getInvictusBaseUrl()}/transactions`);
@@ -1242,17 +1263,36 @@ async function createInvictusCheckout({ order, user, product, origin }) {
   if (!response.ok) {
     throw new Error(rawResponse?.message || "Falha ao criar pagamento.");
   }
-  const data = rawResponse?.data || {};
+
+  const normalized = normalizeInvictusTransaction(rawResponse);
 
   return {
     mode: "provider",
     checkoutUrl: `${origin}/checkout-local/${order.external_id}`,
-    providerPaymentId: data.hash || null,
-    providerStatus: data.status || "pending",
+    providerPaymentId: normalized.hash,
+    providerStatus: normalized.status,
     rawResponse: {
       mode: "provider",
-      ...data
+      payment_method: normalized.payment_method,
+      pix_code: normalized.pix_code,
+      qr_code: normalized.qr_code,
+      billet_url: normalized.billet_url,
+      raw: rawResponse
     }
+  };
+}
+
+function normalizeInvictusTransaction(payload) {
+  const root = payload?.data && typeof payload.data === "object" ? payload.data : payload || {};
+  const pix = root.pix || {};
+  const billet = root.billet || {};
+  return {
+    hash: root.hash || root.id || null,
+    status: String(root.payment_status || root.status || "").toLowerCase() || "pending",
+    payment_method: root.payment_method || "pix",
+    pix_code: pix.pix_qr_code || pix.qr_code || root.pix_code || "",
+    qr_code: pix.qr_code_base64 || root.qr_code || "",
+    billet_url: billet.url || billet.link || root.billet_url || ""
   };
 }
 
@@ -1278,11 +1318,10 @@ async function normalizeWebhookPayload(body, fallbackExternalId) {
 
   if (!status && providerPaymentId && isInvictusConfigured()) {
     const remoteTransaction = await fetchInvictusTransaction(providerPaymentId);
-    status = String(remoteTransaction?.data?.status || "").toLowerCase();
-    body = {
-      ...body,
-      data: remoteTransaction?.data || body?.data
-    };
+    if (remoteTransaction) {
+      status = normalizeInvictusTransaction(remoteTransaction).status;
+      body = { ...body, ...remoteTransaction };
+    }
   }
 
   return {
@@ -1356,12 +1395,12 @@ async function syncOrderWithProvider(order) {
   }
 
   const remoteTransaction = await fetchInvictusTransaction(order.provider_payment_id);
-  if (!remoteTransaction?.data) {
+  if (!remoteTransaction) {
     return order;
   }
 
-  const remote = remoteTransaction.data;
-  const status = String(remote.status || "").toLowerCase();
+  const normalized = normalizeInvictusTransaction(remoteTransaction);
+  const status = normalized.status;
   const nextStatus = ["paid", "approved", "success", "completed", "confirmed", "settled"].includes(status)
     ? "paid"
     : mapProviderStatus(status);
@@ -1369,9 +1408,16 @@ async function syncOrderWithProvider(order) {
 
   statements.updateOrderStatus.run(
     nextStatus,
-    remote.hash || order.provider_payment_id,
+    normalized.hash || order.provider_payment_id,
     status || order.provider_status,
-    JSON.stringify({ mode: "provider", ...remote }),
+    JSON.stringify({
+      mode: "provider",
+      payment_method: normalized.payment_method,
+      pix_code: normalized.pix_code,
+      qr_code: normalized.qr_code,
+      billet_url: normalized.billet_url,
+      raw: remoteTransaction
+    }),
     Date.now(),
     paidAt,
     order.id
@@ -1652,18 +1698,36 @@ function formatCurrency(value) {
   }).format(value / 100);
 }
 
-function buildQrCodeUrl(payload) {
-  const data = encodeURIComponent(String(payload || ""));
-  return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&qzone=1&data=${data}`;
+function renderDottedQrSvg(payload, { size = 220, dotColor = "#f3f3f3", bgColor = "#060606" } = {}) {
+  const text = String(payload || "");
+  if (!text) return "";
+  const qr = QRCode.create(text, { errorCorrectionLevel: "M" });
+  const matrix = qr.modules;
+  const count = matrix.size;
+  const margin = 2;
+  const totalCells = count + margin * 2;
+  const cell = size / totalCells;
+  const radius = cell * 0.42;
+  const dots = [];
+  for (let r = 0; r < count; r++) {
+    for (let c = 0; c < count; c++) {
+      if (matrix.get(r, c)) {
+        const cx = ((c + margin + 0.5) * cell).toFixed(2);
+        const cy = ((r + margin + 0.5) * cell).toFixed(2);
+        dots.push(`<circle cx="${cx}" cy="${cy}" r="${radius.toFixed(2)}"/>`);
+      }
+    }
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="display:block" shape-rendering="geometricPrecision"><rect width="${size}" height="${size}" fill="${bgColor}"/><g fill="${dotColor}">${dots.join("")}</g></svg>`;
 }
 
 function translateStatus(status) {
   const map = {
-    pending: "Aguardando",
-    paid: "Pago",
-    failed: "Recusado",
-    cancelled: "Cancelado",
-    expired: "Expirado"
+    pending: "aguardando",
+    paid: "pago",
+    failed: "recusado",
+    cancelled: "cancelado",
+    expired: "expirado"
   };
   return map[status] || status;
 }

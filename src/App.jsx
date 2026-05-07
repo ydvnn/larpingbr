@@ -17,12 +17,57 @@ const discordIcon = (
 
 const larperLogo = (
   <svg viewBox="0 0 36 36" aria-hidden="true">
-    <path d="M18 4 L29 18 L7 18 Z" fill="currentColor" fillOpacity="0.18" />
+    <path d="M18 4 L8 16 L18 22 Z" fill="currentColor" fillOpacity="0.22" />
+    <path d="M18 4 L18 22 L28 16 Z" fill="currentColor" fillOpacity="0.12" />
+    <path d="M8 16 L18 22 L18 32 Z" fill="currentColor" fillOpacity="0.16" />
     <g stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" fill="none">
-      <path d="M18 4 L29 18 L18 32 L7 18 Z" strokeWidth="1.9" />
-      <path d="M7 18 L29 18" strokeWidth="1.5" />
-      <path d="M18 4 L18 32" strokeWidth="1" strokeOpacity="0.45" />
+      <path d="M18 4 L28 16 L18 32 L8 16 Z" strokeWidth="1.9" />
+      <path d="M8 16 L18 22 L28 16" strokeWidth="1.4" />
+      <path d="M18 4 L18 22 L18 32" strokeWidth="1.3" />
     </g>
+  </svg>
+);
+
+const chevronDownIcon = (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M6 9 L12 15 L18 9"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </svg>
+);
+
+const logoutIcon = (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <g stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" fill="none">
+      <path d="M10 4 L5 4 a1 1 0 0 0 -1 1 L4 19 a1 1 0 0 0 1 1 L10 20" />
+      <path d="M20 12 L9 12" />
+      <path d="M16 8 L20 12 L16 16" />
+    </g>
+  </svg>
+);
+
+const productsIcon = (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <g stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" fill="none">
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.2" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.2" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.2" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.2" />
+    </g>
+  </svg>
+);
+
+const sparkleIcon = (
+  <svg viewBox="0 0 512 512" aria-hidden="true">
+    <path
+      fill="currentColor"
+      d="M256 0 Q 256 256 512 256 Q 256 256 256 512 Q 256 256 0 256 Q 256 256 256 0 Z"
+    />
   </svg>
 );
 
@@ -37,9 +82,10 @@ const bitcoinIcon = (
 );
 
 const fallbackBenefits = [
-  "Acesso ao Discord privado",
-  "Liberação automática após checkout aprovado",
-  "Conteúdos e discussões focados em estética, narrativa e presença"
+  "discord privado e área de membros",
+  "repertório digital editável, fonte aberta",
+  "acervo de mídias, métodos e recursos",
+  "acesso liberado automaticamente após a entrada"
 ];
 
 function Avatar({ buyer, size = "md" }) {
@@ -55,13 +101,33 @@ function Avatar({ buyer, size = "md" }) {
 
 export default function App() {
   const tooltipTriggerRef = useRef(null);
+  const userMenuRef = useRef(null);
   const [storefront, setStorefront] = useState(null);
   const [session, setSession] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [message, setMessage] = useState("");
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [tooltipStyle, setTooltipStyle] = useState({});
+
+  useEffect(() => {
+    if (!isUserMenuOpen) return;
+    const onDocPointerDown = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") setIsUserMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onDocPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDocPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [isUserMenuOpen]);
 
   useEffect(() => {
     loadData();
@@ -82,13 +148,13 @@ export default function App() {
       setStorefront(await storefrontResponse.json());
       setSession(await sessionResponse.json());
     } catch {
-      setLoadError("Não foi possível carregar a Larping Brasil agora. Tente novamente em instantes.");
+      setLoadError("não foi possível carregar agora. tenta de novo em instantes.");
     }
   }
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    setMessage("Sessão encerrada.");
+    setMessage("sessão encerrada.");
     await loadData();
   }
 
@@ -119,7 +185,7 @@ export default function App() {
     }
 
     if (!productId) {
-      setMessage("Produto indisponível no momento.");
+      setMessage("produto indisponível no momento.");
       return;
     }
 
@@ -134,7 +200,7 @@ export default function App() {
 
       const payload = await response.json();
       if (!response.ok) {
-        setMessage(payload.message || "Não foi possível iniciar a compra.");
+        setMessage(payload.message || "não foi possível iniciar a compra.");
         return;
       }
 
@@ -147,17 +213,17 @@ export default function App() {
   if (loadError) {
     return (
       <main className="screen-loader error-state">
-        <strong>Algo saiu do fluxo.</strong>
+        <strong>algo saiu do fluxo.</strong>
         <p>{loadError}</p>
         <button className="primary-button" onClick={loadData}>
-          Tentar novamente
+          tentar novamente
         </button>
       </main>
     );
   }
 
   if (!storefront || !session) {
-    return <div className="screen-loader">Carregando Larping Brasil...</div>;
+    return <div className="screen-loader">carregando...</div>;
   }
 
   const loggedUser = session.user;
@@ -172,60 +238,80 @@ export default function App() {
   const topCustomer = storefront.topBuyers?.[0];
   const recentPurchases = storefront.recentBuyers?.slice(0, 10) || [];
   const fallbackRecentPurchases = [
-    { name: "Carter_royall", product: "Larper+" },
-    { name: "Charlieatk2", product: "Larper+" },
-    { name: "artera", product: "Larper+" },
-    { name: "fedded", product: "Larper+" },
-    { name: "930485k", product: "Larper+" },
-    { name: "wansueylarper", product: "Larper+" }
+    { name: "Carter_royall", product: "larper+" },
+    { name: "Charlieatk2", product: "larper+" },
+    { name: "artera", product: "larper+" },
+    { name: "fedded", product: "larper+" },
+    { name: "930485k", product: "larper+" },
+    { name: "wansueylarper", product: "larper+" }
   ];
   const carouselBuyers = recentPurchases.length ? recentPurchases : fallbackRecentPurchases;
   const carouselBase = (() => {
-    const minBaseCount = 8;
+    const minBaseCount = 10;
     const filled = [];
     while (filled.length < minBaseCount) {
       filled.push(...carouselBuyers);
     }
     return filled;
   })();
-  const rotateOffset = Math.ceil(carouselBase.length / 2);
-  const carouselBaseRotated = [...carouselBase.slice(rotateOffset), ...carouselBase.slice(0, rotateOffset)];
-  const carouselRows = [
-    [...carouselBase, ...carouselBase],
-    [...carouselBaseRotated, ...carouselBaseRotated]
-  ];
+  const carouselTrack = [...carouselBase, ...carouselBase];
 
   return (
     <div className="page-shell">
       <header className="topbar">
-        <a className="brand" href="#topo" aria-label="Ir para o início">
+        <a className="brand" href="#topo" aria-label="ir para o início">
           <span className="brand-mark">{larperLogo}</span>
-          <span>
-            <strong>Larping Brasil</strong>
-          </span>
+          <span className="brand-text">larping</span>
         </a>
 
         <div className="account-actions">
           {loggedUser ? (
-            <>
-              <div className="user-chip">
+            <div className="user-menu" ref={userMenuRef}>
+              <button
+                type="button"
+                className={`user-chip user-chip-trigger${isUserMenuOpen ? " open" : ""}`}
+                onClick={() => setIsUserMenuOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={isUserMenuOpen}
+              >
                 {loggedUser.avatar ? <img src={loggedUser.avatar} alt="" /> : <span>{loggedUser.username[0]}</span>}
                 <div>
-                  <span className="user-chip-name">
-                    <strong>{loggedUser.globalName || loggedUser.username}</strong>
-                    {ownedProductSlugs.has("larper-plus") ? <span className="larper-badge">Larper+</span> : null}
-                  </span>
+                  <strong>{loggedUser.globalName || loggedUser.username}</strong>
                   <small>@{loggedUser.username}</small>
                 </div>
-              </div>
-              <button className="ghost-button" onClick={handleLogout}>
-                Sair
+                <span className="user-chip-caret" aria-hidden="true">{chevronDownIcon}</span>
               </button>
-            </>
+              {isUserMenuOpen ? (
+                <div className="user-menu-popover" role="menu">
+                  {ownedProductSlugs.has("larper-plus") ? (
+                    <div className="user-menu-status">
+                      <span className="status-dot" aria-hidden="true" />
+                      larper+ ativo
+                    </div>
+                  ) : (
+                    <div className="user-menu-status muted">
+                      sem assinatura
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="user-menu-item"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      handleLogout();
+                    }}
+                  >
+                    <span className="icon-wrap">{logoutIcon}</span>
+                    sair
+                  </button>
+                </div>
+              ) : null}
+            </div>
           ) : (
             <a className="discord-button" href="/api/auth/discord/login">
               <span className="icon-wrap">{discordIcon}</span>
-              Entrar com Discord
+              entrar com discord
             </a>
           )}
         </div>
@@ -235,17 +321,16 @@ export default function App() {
         <section className="hero">
           <div className="hero-copy">
             <div className="hero-eyebrow-row">
-              <p className="eyebrow">A arte do Larping</p>
-              <span className="on-chain-badge">
-                <span className="on-chain-dot" aria-hidden="true" />
-                On-chain
-              </span>
+              <p className="eyebrow">
+                <span className="eyebrow-sparkle">{sparkleIcon}</span>
+                a arte do larping
+              </p>
             </div>
             <h1>
-              A nova <em>elite</em> da internet
+              a nova <em>elite</em> da internet
             </h1>
             <p className="hero-text">
-              Somos uma comunidade com acesso privado para quem entende{" "}
+              comunidade fechada de quem leva{" "}
               <span className="term-tooltip">
                 <button
                   ref={tooltipTriggerRef}
@@ -258,32 +343,42 @@ export default function App() {
                   larping
                 </button>
                 <span className="term-tooltip-bubble" role="tooltip" style={tooltipStyle}>
-                  <span>
-                    Gíria usada para se referir ao ato de fingir ser algo ou alguém que não se é.
+                  <span className="term-tooltip-head">
+                    <span className="term-tooltip-word">larp</span>
+                    <span className="term-tooltip-phon">/laʁp/</span>
                   </span>
-                  <span className="term-tooltip-example">Ex.: "Esse influencer vive de larp de milionário."</span>
+                  <span className="term-tooltip-meta">
+                    <span>subst. masc.</span>
+                    <span className="term-tooltip-dot" aria-hidden="true">·</span>
+                    <span>gíria</span>
+                  </span>
+                  <span className="term-tooltip-def-block">
+                    <span className="term-tooltip-def-num">1.</span>
+                    <span className="term-tooltip-def">
+                      ato de fingir ser algo ou alguém que não se é, geralmente em redes sociais.
+                    </span>
+                  </span>
                   <a
                     className="term-tooltip-source"
                     href="https://www.dicionarioinformal.com.br/larp/"
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Dicionário inFormal
+                    <span>dicionário informal</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M7 17 L17 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                      <path d="M9 7 L17 7 L17 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    </svg>
                   </a>
                 </span>
               </span>
-              , estética, narrativa e presença como ferramentas de status online.
+              {" "}a sério.
             </p>
             <div className="hero-actions">
-              <button className="primary-button" onClick={() => setIsCatalogOpen(true)}>
-                Ver Larper+
+              <button className="primary-button products-cta" onClick={() => setIsCatalogOpen(true)}>
+                <span className="icon-wrap products-cta-icon">{productsIcon}</span>
+                ver produtos
               </button>
-              {!loggedUser ? (
-                <a className="secondary-button" href="/api/auth/discord/login">
-                  <span className="icon-wrap">{discordIcon}</span>
-                  Entrar antes de comprar
-                </a>
-              ) : null}
             </div>
           </div>
 
@@ -292,7 +387,7 @@ export default function App() {
               <iframe
                 className="hero-stage-frame"
                 src={SPLINE_SCENE_URL}
-                title="Larping Brasil 3D"
+                title="larping 3d"
                 loading="lazy"
                 allow="autoplay; fullscreen"
               />
@@ -303,110 +398,130 @@ export default function App() {
                 </Suspense>
                 <span className="hero-orbit hero-orbit-1" />
                 <span className="hero-orbit hero-orbit-2" />
+                <span className="hero-orbit hero-orbit-3" />
               </div>
             )}
           </div>
         </section>
 
-        <section className="section-block features-section" aria-label="O que você acessa">
+        <section className="section-block community-section" aria-label="quem tá dentro">
           <header className="section-header">
-            <p className="eyebrow">// O que você acessa</p>
-            <h2>Estrutura para construir <em>presença</em>.</h2>
+            <p className="eyebrow">// quem tá dentro</p>
           </header>
-          <div className="features-grid">
-            <article className="feature-card">
-              <span className="feature-num">// 01</span>
-              <h3>Acervo de métodos</h3>
-              <p>Frameworks e playbooks usados por operadores que dominaram a arte. Construção de persona, edição visual, curadoria de feed e timing de postagem.</p>
+          <div className="dashboard-grid">
+            <article className="panel top-customer">
+              <p className="panel-label">maior comprador</p>
+              <div className="buyer-spotlight">
+                <Avatar buyer={topCustomer || { name: "wansueylarper" }} size="lg" />
+                <div>
+                  <strong>{topCustomer?.name || "wansueylarper"}</strong>
+                  {topCustomer?.total ? <p>{topCustomer.total}</p> : null}
+                </div>
+              </div>
             </article>
-            <article className="feature-card">
-              <span className="feature-num">// 02</span>
-              <h3>Discord privado</h3>
-              <p>Canais segmentados para feedback honesto de presença, troca de referências e debate técnico. Acesso liberado automaticamente após o pagamento.</p>
-            </article>
-            <article className="feature-card">
-              <span className="feature-num">// 03</span>
-              <h3>Drops semanais</h3>
-              <p>Conteúdos novos toda semana: breakdowns de personas públicas, templates de bio, estruturas narrativas e cases comentados em vídeo.</p>
-            </article>
-            <article className="feature-card">
-              <span className="feature-num">// 04</span>
-              <h3>Rede de operadores</h3>
-              <p>Networking direto com larpers em diferentes níveis de execução. Feedback vertical de quem está alguns passos à frente do seu.</p>
-            </article>
-          </div>
-        </section>
 
-        <section className="section-block process-section" aria-label="Como funciona">
-          <header className="section-header">
-            <p className="eyebrow">// Como funciona</p>
-            <h2>Três passos para entrar.</h2>
-          </header>
-          <ol className="process-list">
-            <li className="process-step">
-              <span className="process-num">→ 01</span>
-              <div>
-                <h3>Conecte-se via Discord</h3>
-                <p>Login OAuth com sua conta. A identidade da comunidade começa pelo cargo no servidor.</p>
-              </div>
-            </li>
-            <li className="process-step">
-              <span className="process-num">→ 02</span>
-              <div>
-                <h3>Adquira o Larper+</h3>
-                <p>Pagamento único de R$ 30 via PIX. Liberação automática do cargo no Discord assim que confirmar.</p>
-              </div>
-            </li>
-            <li className="process-step">
-              <span className="process-num">→ 03</span>
-              <div>
-                <h3>Mergulhe no acervo</h3>
-                <p>Aplique os métodos, compartilhe progresso, itere com feedback até a presença ficar inquebrável.</p>
-              </div>
-            </li>
-          </ol>
-        </section>
-
-        <section className="dashboard-grid" aria-label="Atividade da comunidade">
-          <article className="panel top-customer">
-            <span className="panel-label">Maior comprador</span>
-            <div className="buyer-spotlight">
-              <Avatar buyer={topCustomer || { name: "wansueylarper" }} size="lg" />
-              <div>
-                <strong>{topCustomer?.name || "wansueylarper"}</strong>
-                <p>{topCustomer?.total ? `${topCustomer.total} em compras confirmadas.` : "Foi quem mais comprou este mês."}</p>
-              </div>
-            </div>
-          </article>
-
-          <article className="panel recent-panel">
-            <span className="panel-label">Compras recentes</span>
-            <div className="purchase-carousel" aria-label="Carrossel de compradores recentes">
-              {carouselRows.map((row, rowIndex) => (
-                <div className={`purchase-track ${rowIndex === 1 ? "reverse" : ""}`} key={`row-${rowIndex}`}>
-                  {row.map((buyer, index) => (
-                    <div className="purchase-card" key={`${rowIndex}-${buyer.name}-${buyer.product || "compra"}-${index}`}>
+            <article className="panel recent-panel">
+              <p className="panel-label">compras recentes</p>
+              <div className="purchase-carousel" aria-label="carrossel de compradores recentes">
+                <div className="purchase-track">
+                  {carouselTrack.map((buyer, index) => (
+                    <div className="purchase-card" key={`${buyer.name}-${buyer.product || "compra"}-${index}`}>
                       <Avatar buyer={buyer} />
-                      <div>
-                        <p>{buyer.name}</p>
+                      <div className="purchase-card-text">
+                        <strong>{buyer.name}</strong>
+                        <span>{(buyer.product || "larper+").toLowerCase()}</span>
                       </div>
                     </div>
                   ))}
                 </div>
-              ))}
-            </div>
-          </article>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section className="section-block features-section" aria-label="o que tem dentro">
+          <header className="section-header">
+            <p className="eyebrow">// o que tem dentro</p>
+            <h2>conteúdo, <em>cultura</em> e network.</h2>
+          </header>
+          <div className="features-grid">
+            <article className="feature-card">
+              <span className="feature-num">// 01</span>
+              <h3>acervo</h3>
+              <p>mídia, cenário e ambientação. uso livre.</p>
+            </article>
+            <article className="feature-card">
+              <span className="feature-num">// 02</span>
+              <h3>repertório digital</h3>
+              <p>materiais editáveis. fonte aberta, atualização contínua.</p>
+            </article>
+            <article className="feature-card">
+              <span className="feature-num">// 03</span>
+              <h3>discord privado</h3>
+              <p>com divisão de tópico e networking direto.</p>
+            </article>
+          </div>
+        </section>
+
+        <section className="section-block process-section" aria-label="como entra">
+          <header className="section-header">
+            <p className="eyebrow">// como entra</p>
+          </header>
+          <div className="features-grid">
+            <article className="feature-card">
+              <span className="feature-num">→ 01</span>
+              <h3>login com discord</h3>
+              <p>sua conta vira o id na comunidade.</p>
+            </article>
+            <article className="feature-card">
+              <span className="feature-num">→ 02</span>
+              <h3>confirma a entrada</h3>
+              <p>acesso vitalício, sem renovação.</p>
+            </article>
+            <article className="feature-card">
+              <span className="feature-num">→ 03</span>
+              <h3>acesso liberado</h3>
+              <p>automático, sem espera.</p>
+            </article>
+          </div>
         </section>
       </main>
+
+      <footer className="footer">
+        <div className="footer-main">
+          <a className="brand footer-brand" href="#topo">
+            <span className="brand-mark">{larperLogo}</span>
+            <div className="footer-brand-text">
+              <strong>larping</strong>
+              <small>a nova elite da internet</small>
+            </div>
+          </a>
+
+          <a
+            className="footer-discord-icon"
+            href="https://discord.gg/NGdsrUnq"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="discord"
+          >
+            {discordIcon}
+          </a>
+        </div>
+
+        <div className="footer-meta">
+          <span>© {new Date().getFullYear()} larping</span>
+          <span>todos os direitos reservados</span>
+        </div>
+      </footer>
 
       {isCatalogOpen ? (
         <div className="modal-backdrop" onClick={() => setIsCatalogOpen(false)}>
           <div className="catalog-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
             <div className="catalog-head">
               <div>
-                <span className="panel-label">Produto</span>
+                <span className="panel-label">produto</span>
               </div>
-              <button className="close-button" onClick={() => setIsCatalogOpen(false)} aria-label="Fechar popup">
+              <button className="close-button" onClick={() => setIsCatalogOpen(false)} aria-label="fechar">
                 ×
               </button>
             </div>
@@ -416,51 +531,51 @@ export default function App() {
                 const isOwned = loggedUser && ownedProductSlugs.has(item.slug);
                 return (
                 <article className="catalog-item" key={item.id || item.slug || item.name}>
-                  <div className="catalog-row">
-                    <div>
-                      <strong className="product-name">
-                        <span className="bitcoin-icon">{bitcoinIcon}</span>
-                        {item.name || "Larper+"}
-                      </strong>
-                      <p>{item.description || "Acesso principal para entrar na comunidade fechada."}</p>
-                    </div>
+                  <header className="catalog-item-head">
+                    <strong className="product-name">
+                      <span className="bitcoin-icon">{bitcoinIcon}</span>
+                      {(item.name || "larper+").toLowerCase()}
+                    </strong>
+                    <p className="product-desc">{(item.description || "acesso à comunidade fechada.").toLowerCase()}</p>
+                  </header>
+
+                  <ul className="benefit-list">
+                    {(item.benefits?.length ? item.benefits : fallbackBenefits).map((benefit) => (
+                      <li key={`${item.id || item.name}-${benefit}`}>{benefit.toLowerCase()}</li>
+                    ))}
+                  </ul>
+
+                  <footer className="catalog-item-foot">
                     <div className="catalog-price">
                       <strong>{item.price || "R$ 30,00"}</strong>
                       <span>pagamento único</span>
                     </div>
-                  </div>
-
-                  <ul className="benefit-list">
-                    {(item.benefits?.length ? item.benefits : fallbackBenefits).map((benefit) => (
-                      <li key={`${item.id || item.name}-${benefit}`}>{benefit}</li>
-                    ))}
-                  </ul>
-
-                  {loggedUser ? (
-                    <button
-                      className="primary-button block-button"
-                      onClick={() => handlePurchase(item.id)}
-                      disabled={!item.id || busyId === item.id || isOwned}
-                    >
-                      {isOwned
-                        ? "Já adquirido"
-                        : busyId === item.id
-                          ? "Abrindo checkout..."
-                          : "Comprar Larper+"}
-                    </button>
-                  ) : (
-                    <a className="primary-button block-button" href="/api/auth/discord/login">
-                      <span className="icon-wrap">{discordIcon}</span>
-                      Entrar para comprar
-                    </a>
-                  )}
+                    {loggedUser ? (
+                      <button
+                        className="primary-button block-button"
+                        onClick={() => handlePurchase(item.id)}
+                        disabled={!item.id || busyId === item.id || isOwned}
+                      >
+                        {isOwned
+                          ? "já adquirido"
+                          : busyId === item.id
+                            ? "abrindo checkout..."
+                            : `comprar ${(item.name || "larper+").toLowerCase()}`}
+                      </button>
+                    ) : (
+                      <a className="primary-button block-button" href="/api/auth/discord/login">
+                        <span className="icon-wrap">{discordIcon}</span>
+                        entrar para comprar
+                      </a>
+                    )}
+                  </footer>
                 </article>
                 );
               })
             ) : (
               <div className="empty-catalog">
-                <strong>Nenhum produto disponível.</strong>
-                <p>Volte em instantes ou entre em contato pelo Discord.</p>
+                <strong>nenhum produto disponível.</strong>
+                <p>volta em instantes ou entra em contato pelo discord.</p>
               </div>
             )}
           </div>

@@ -1,6 +1,7 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Float } from "@react-three/drei";
 import { useMemo, useRef } from "react";
+import * as THREE from "three";
 
 const OCT_VERTICES = [
   [0, 1.3, 0],
@@ -26,7 +27,8 @@ function PulsingEdge({
   dotCount = 14,
   dotSize = 0.038,
   reverse = false,
-  hueOffset = 0
+  hueOffset = 0,
+  pulseEnabled = true
 }) {
   const dots = useMemo(() => {
     const a = reverse ? end : start;
@@ -48,11 +50,32 @@ function PulsingEdge({
 
   const matRefs = useRef([]);
   const meshRefs = useRef([]);
+  const haloMatRefs = useRef([]);
+  const haloMeshRefs = useRef([]);
+  const staticInitialized = useRef(false);
 
   useFrame(({ clock }) => {
+    if (!pulseEnabled) {
+      if (staticInitialized.current) return;
+      dots.forEach((_, i) => {
+        const mat = matRefs.current[i];
+        const mesh = meshRefs.current[i];
+        const haloMat = haloMatRefs.current[i];
+        if (mat) {
+          mat.color.setHSL(0, 0, 0.85);
+          mat.opacity = baseOpacity;
+        }
+        if (mesh) mesh.scale.setScalar(0.82);
+        if (haloMat) haloMat.opacity = 0;
+      });
+      staticInitialized.current = true;
+      return;
+    }
+    staticInitialized.current = false;
+
     const pulseT = (clock.elapsedTime * pulseSpeed + phase) % 1;
     const sigmaLead = 0.04;
-    const tauTrail = 0.28;
+    const tauTrail = 0.6;
     const t = clock.elapsedTime;
 
     dots.forEach((dot, i) => {
@@ -69,25 +92,47 @@ function PulsingEdge({
           ? Math.exp(-(dist * dist) / (2 * sigmaLead * sigmaLead))
           : Math.exp(-dist / tauTrail);
 
-      const hue = (t * 0.07 + phase + dot.t * 0.22 + hueOffset) % 1;
-      mat.color.setHSL(hue, 0.85, 0.8);
+      const sigmaHead = 0.022;
+      const headIntensity = Math.exp(-(dist * dist) / (2 * sigmaHead * sigmaHead));
 
+      const hue = (t * 0.07 + phase + dot.t * 0.22 + hueOffset) % 1;
+      mat.color.setHSL(hue, 0.4, 0.85);
       mat.opacity = baseOpacity + (1 - baseOpacity) * intensity;
       mesh.scale.setScalar(0.82 + intensity * 0.55);
+
+      const haloMat = haloMatRefs.current[i];
+      const haloMesh = haloMeshRefs.current[i];
+      if (haloMat && haloMesh) {
+        haloMat.color.setHSL(hue, 0.32, 0.9);
+        haloMat.opacity = headIntensity * 0.2;
+        haloMesh.scale.setScalar(0.6 + headIntensity * 0.7);
+      }
     });
   });
 
   return (
     <>
       {dots.map((dot, i) => (
-        <mesh key={i} ref={(el) => (meshRefs.current[i] = el)} position={dot.pos}>
-          <sphereGeometry args={[dotSize, 8, 8]} />
-          <meshBasicMaterial
-            ref={(el) => (matRefs.current[i] = el)}
-            transparent
-            toneMapped={false}
-          />
-        </mesh>
+        <group key={i} position={dot.pos}>
+          <mesh ref={(el) => (haloMeshRefs.current[i] = el)}>
+            <sphereGeometry args={[dotSize * 2.4, 12, 12]} />
+            <meshBasicMaterial
+              ref={(el) => (haloMatRefs.current[i] = el)}
+              transparent
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+              toneMapped={false}
+            />
+          </mesh>
+          <mesh ref={(el) => (meshRefs.current[i] = el)}>
+            <sphereGeometry args={[dotSize, 8, 8]} />
+            <meshBasicMaterial
+              ref={(el) => (matRefs.current[i] = el)}
+              transparent
+              toneMapped={false}
+            />
+          </mesh>
+        </group>
       ))}
     </>
   );
@@ -115,6 +160,7 @@ function WireOctahedron({
           dotCount={dotCount}
           dotSize={dotSize}
           hueOffset={(hueOffsetBase + i * 0.083) % 1}
+          pulseEnabled={i % 2 === 0}
         />
       ))}
     </group>
@@ -140,20 +186,20 @@ function Gem() {
       <Float speed={1.0} rotationIntensity={0.22} floatIntensity={0.28}>
         <group ref={outerRef}>
           <WireOctahedron
-            baseOpacity={0.32}
+            baseOpacity={0.5}
             pulseSpeed={0.4}
-            dotSize={0.011}
-            dotCount={32}
+            dotSize={0.006}
+            dotCount={48}
             hueOffsetBase={0}
           />
         </group>
         <group ref={innerRef}>
           <WireOctahedron
             scale={0.58}
-            baseOpacity={0.45}
+            baseOpacity={0.6}
             pulseSpeed={0.6}
-            dotSize={0.008}
-            dotCount={26}
+            dotSize={0.0105}
+            dotCount={28}
             hueOffsetBase={0.42}
           />
         </group>
