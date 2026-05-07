@@ -4,4 +4,3 @@ dist
 data
 .playwright-mcp/
 .claude/settings.local.json
-/*.png
