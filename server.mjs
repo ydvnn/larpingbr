@@ -4,7 +4,6 @@ import http from "node:http";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
-import { createServer as createViteServer } from "vite";
 import QRCode from "qrcode";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -192,6 +191,7 @@ seedProducts();
 
 let vite;
 if (!isProd) {
+  const { createServer: createViteServer } = await import("vite");
   vite = await createViteServer({
     root: rootDir,
     server: { middlewareMode: true },
