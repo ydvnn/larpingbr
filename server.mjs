@@ -13,7 +13,7 @@ const rootDir = __dirname;
 await loadEnvFile(path.join(rootDir, ".env"));
 const isProd = process.argv.includes("--prod");
 const port = Number(process.env.PORT || 3000);
-const host = process.env.HOST || "127.0.0.1";
+const host = process.env.HOST || (isProd ? "0.0.0.0" : "127.0.0.1");
 const appUrl = process.env.APP_URL || `http://${host}:${port}`;
 const cookieName = "larper_session";
 const oauthStateCookie = "larper_oauth_state";
