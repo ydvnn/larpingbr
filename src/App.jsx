@@ -499,7 +499,7 @@ export default function App() {
 
           <a
             className="footer-discord-icon"
-            href="https://discord.gg/NGdsrUnq"
+            href="https://discord.gg/5qashjk2Ug"
             target="_blank"
             rel="noreferrer"
             aria-label="discord"
